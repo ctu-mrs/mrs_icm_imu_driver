@@ -199,7 +199,7 @@ void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
   if (ret == 8) {  // Check if all 8 values were successfully read
 
     try {
-      ROS_INFO("[MrsIcmImuDriver]: publishing IMU data");
+      ROS_INFO_ONCE("[MrsIcmImuDriver]: publishing IMU data");
       imu_publisher_.publish(imu);
     }
     catch (...) {
