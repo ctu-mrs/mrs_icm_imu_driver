@@ -20,7 +20,7 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- IcmImuDriver nodelet -->
-    <node pkg="nodelet" type="nodelet" name="mrs_icm_imu_driver" args="$(arg nodelet) mrs_icm_imu_driver/MrsIcmImuDriver $(arg nodelet_manager)" launch-prefix="$(arg launch_prefix_debug)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="icm_imu" args="$(arg nodelet) mrs_icm_imu_driver/MrsIcmImuDriver $(arg nodelet_manager)" launch-prefix="$(arg launch_prefix_debug)" output="screen">
 
       <!-- Parameters loaded from launch file -->
       <param name="uav_name" value="$(arg UAV_NAME)" />
@@ -28,22 +28,7 @@
         <!-- ROS parameters config file -->
       <rosparam file="$(find mrs_icm_imu_driver)/config/imu.yaml" />
 
-        <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
-      <remap from="~odom_uav_in" to="estimation_manager/odom_main" />
-      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
-      <remap from="~odom_gt_in" to="ground_truth" />
-
-        <!-- Publishers (note that the topic names will also be remapped using the namespace as a prefix) -->
-      <remap from="~reference_out" to="control_manager/reference" />
-      <remap from="~dist_to_waypoint_out" to="~dist_to_waypoint" />
-
-        <!-- Service servers (note that the service names will also be remapped using the namespace as a prefix) -->
-      <remap from="~start_waypoints_following_in" to="~start_waypoints_following" />
-      <remap from="~stop_waypoints_following_in" to="~stop_waypoints_following" />
-      <remap from="~fly_to_first_waypoint_in" to="~fly_to_first_waypoint" />
-
-        <!-- Service clients (note that the service names will also be remapped using the namespace as a prefix) -->
-      <remap from="~land_out" to="uav_manager/land" />
+      <remap from="~imu_out" to="~imu" />
 
     </node>
 

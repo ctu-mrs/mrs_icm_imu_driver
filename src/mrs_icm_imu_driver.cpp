@@ -163,7 +163,7 @@ void MrsIcmImuDriver::onInit() {
   timer_imu_     = nh.createTimer(5000, &MrsIcmImuDriver::timerImu, this);
   imu_publisher_ = nh.advertise<sensor_msgs::Imu>("imu_out", 10);
 
-  ROS_INFO("[MrsIcmImuDriver]: Initialized");
+  ROS_INFO("[IcmImuDriver]: Initialized");
 
   is_initialized_ = true;
 }
@@ -183,7 +183,7 @@ void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
   FILE* fifo = fopen("/dev/icm_imu", "r");
 
   if (fifo == nullptr) {
-    ROS_ERROR_THROTTLE(1.0, "[MrsIcmImuDriver]: Failed to open FIFO");
+    ROS_ERROR_THROTTLE(1.0, "[IcmImuDriver]: Failed to open FIFO");
     return;
   }
 
@@ -199,17 +199,19 @@ void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
   if (ret == 8) {  // Check if all 8 values were successfully read
 
     try {
+      ROS_INFO("[MrsIcmImuDriver]: publishing IMU data");
       imu_publisher_.publish(imu);
     }
     catch (...) {
-      ROS_ERROR_THROTTLE(1.0, "[MrsIcmImuDriver]: exception caught when publishing");
+      ROS_ERROR_THROTTLE(1.0, "[IcmImuDriver]: exception caught when publishing");
     }
 
   } else {
-    ROS_INFO_THROTTLE(1.0, "[MrsIcmImuDriver]: Error reading from FIFO or no more data");
+    ROS_INFO_THROTTLE(1.0, "[IcmImuDriver]: Error reading from FIFO or no more data");
   }
 
   fclose(fifo);
+
   return;
 }
 
