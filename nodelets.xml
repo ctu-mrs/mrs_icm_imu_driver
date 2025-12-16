@@ -1,5 +1,0 @@
-<library path="lib/libMrsIcmImuDriver">
-  <class name="mrs_icm_imu_driver/MrsIcmImuDriver" type="mrs_icm_imu_driver::MrsIcmImuDriver" base_class_type="nodelet::Nodelet">
-    <description>MrsIcmImuDriver nodelet</description>
-  </class>
-</library>

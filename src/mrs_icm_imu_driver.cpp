@@ -1,10 +1,7 @@
 /* include //{ */
 
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <nodelet/nodelet.h>
-
-#include <sensor_msgs/Imu.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -131,40 +128,59 @@ const float ACC_SCALER  = 8192;
 const float GYRO_SCALER = 16.384;
 
 
-namespace mrs_icm_imu_driver
-{
+namespace mrs_icm_imu_driver {
 
 /* class MrsIcmImuDriver //{ */
 
-class MrsIcmImuDriver : public nodelet::Nodelet {
-
+class MrsIcmImuDriver : public rclcpp::Node {
 public:
-  virtual void onInit();
+  MrsIcmImuDriver(rclcpp::NodeOptions options);
 
 private:
-  std::atomic<bool> is_initialized_ = false;
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+  void initialize();
 
-  ros::Timer timer_imu_;
-  void       timerImu(const ros::TimerEvent& te);
+  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
+  void                         timerPreInitialization();
+  std::atomic<bool>            is_initialized_ = false;
 
-  ros::Publisher imu_publisher_;
+  rclcpp::TimerBase::SharedPtr timer_imu_;
+  void       timerImu();
+
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
 };
 
 //}
 
-/* onInit() //{ */
+/* MrsIcmImuDriver() //{ */
 
-void MrsIcmImuDriver::onInit() {
+MrsIcmImuDriver::MrsIcmImuDriver(rclcpp::NodeOptions options) : Node("IcmImuDriver", options) {
+  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&MrsIcmImuDriver::timerPreInitialization, this));
+}
 
-  ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+//}
 
-  ros::Time::waitForValid();
+/* timerPreInitialization() //{ */
 
-  timer_imu_     = nh.createTimer(5000, &MrsIcmImuDriver::timerImu, this);
-  imu_publisher_ = nh.advertise<sensor_msgs::Imu>("imu_out", 10);
+void MrsIcmImuDriver::timerPreInitialization() {
+  node_  = this->shared_from_this();
+  clock_ = node_->get_clock();
 
-  ROS_INFO("[IcmImuDriver]: Initialized");
+  initialize();
+  timer_preinitialization_->cancel();
+}
 
+//}
+
+/* initialize() //{ */
+
+void MrsIcmImuDriver::initialize() {
+
+  timer_imu_     = create_wall_timer(std::chrono::milliseconds(5000), std::bind(&MrsIcmImuDriver::timerImu, this));
+  imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>("imu_out", 10);
+
+  RCLCPP_INFO(node_->get_logger(), "Initialized");
   is_initialized_ = true;
 }
 
@@ -174,16 +190,14 @@ void MrsIcmImuDriver::onInit() {
 
 /* timerImu() //{ */
 
-void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
-
-  if (!is_initialized_) {
+void MrsIcmImuDriver::timerImu() {
+  if (!is_initialized_)
     return;
-  }
 
   FILE* fifo = fopen("/dev/icm_imu", "r");
 
   if (fifo == nullptr) {
-    ROS_ERROR_THROTTLE(1.0, "[IcmImuDriver]: Failed to open FIFO");
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Failed to open FIFO");
     return;
   }
 
@@ -191,27 +205,25 @@ void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
   /* float    gyro_x, gyro_y, gyro_z; */
   /* uint64_t time_s, time_nsec; */
 
-  sensor_msgs::Imu imu;
-
+  sensor_msgs::msg::Imu imu;
   int ret = fscanf(fifo, "Ax: %lf Ay: %lf Az: %lf Gx: %lf Gy: %lf Gz: %lf Time: %u:%u", &imu.linear_acceleration.x, &imu.linear_acceleration.y,
                    &imu.linear_acceleration.z, &imu.angular_velocity.x, &imu.angular_velocity.y, &imu.angular_velocity.z, &imu.header.stamp.sec,
-                   &imu.header.stamp.nsec);
-  if (ret == 8) {  // Check if all 8 values were successfully read
+                   &imu.header.stamp.nanosec);
 
+  if (ret == 8) {  // Check if all 8 values were successfully read
     try {
-      ROS_INFO_ONCE("[MrsIcmImuDriver]: publishing IMU data");
-      imu_publisher_.publish(imu);
+      RCLCPP_INFO_ONCE(node_->get_logger(), "Publishing IMU data");
+      imu_publisher_->publish(imu);
     }
     catch (...) {
-      ROS_ERROR_THROTTLE(1.0, "[IcmImuDriver]: exception caught when publishing");
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Exception caught when publishing");
     }
 
   } else {
-    ROS_INFO_THROTTLE(1.0, "[IcmImuDriver]: Error reading from FIFO or no more data");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Error reading from FIFO or no more data");
   }
 
   fclose(fifo);
-
   return;
 }
 
@@ -219,6 +231,5 @@ void MrsIcmImuDriver::timerImu([[maybe_unused]] const ros::TimerEvent& te) {
 
 }  // namespace mrs_icm_imu_driver
 
-/* every nodelet must include macros which export the class as a nodelet plugin */
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_icm_imu_driver::MrsIcmImuDriver, nodelet::Nodelet);
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_icm_imu_driver::MrsIcmImuDriver);
