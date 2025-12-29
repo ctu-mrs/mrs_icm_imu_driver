@@ -176,11 +176,24 @@ void MrsIcmImuDriver::timerPreInitialization() {
 /* initialize() //{ */
 
 void MrsIcmImuDriver::initialize() {
+  int rate_hz;
 
-  timer_imu_     = create_wall_timer(std::chrono::milliseconds(5000), std::bind(&MrsIcmImuDriver::timerImu, this));
+  if (!node_->has_parameter("rate_hz")) {
+    try {
+      node_->declare_parameter<int>("rate_hz");
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not load compulsory parameter 'rate_hz': " << e.what());
+    }
+  }
+
+  // Convert to milliseconds period
+  node_->get_parameter("rate_hz", rate_hz);
+  rate_hz = 1000 / std::clamp(rate_hz, 1, 1000);
+
+  timer_imu_     = create_wall_timer(std::chrono::milliseconds(rate_hz), std::bind(&MrsIcmImuDriver::timerImu, this));
   imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>("imu_out", 10);
 
-  RCLCPP_INFO(node_->get_logger(), "Initialized");
+  RCLCPP_INFO(node_->get_logger(), "Initialized, sending IMU data every %d milliseconds", rate_hz);
   is_initialized_ = true;
 }
 

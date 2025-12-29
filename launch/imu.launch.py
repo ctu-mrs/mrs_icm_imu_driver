@@ -103,6 +103,18 @@ def generate_launch_description():
 
     # #} end of use_sim_time
 
+    # #{ rate_hz
+
+    rate_hz = LaunchConfiguration('rate_hz')
+
+    ld.add_action(DeclareLaunchArgument(
+        'rate_hz',
+        default_value=os.getenv('RATE_HZ', '100'),
+        description='The rate in Hz to publish the IMU messages',
+    ))
+
+    # #} end of rate_hz
+
     # #{ log_level
 
     ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
@@ -123,6 +135,7 @@ def generate_launch_description():
             this_pkg_path + '/config/imu.yaml',
             {'uav_name': uav_name},
             {'use_sim_time': use_sim_time},
+            {'rate_hz': rate_hz},
             {'custom_config': custom_config},
         ],
 
