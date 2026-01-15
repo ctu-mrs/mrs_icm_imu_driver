@@ -165,7 +165,7 @@ private:
 
 /* MrsIcmImuDriver() //{ */
 
-MrsIcmImuDriver::MrsIcmImuDriver(rclcpp::NodeOptions options) : Node("IcmImuDriver", options) {
+MrsIcmImuDriver::MrsIcmImuDriver(rclcpp::NodeOptions options) : mrs_lib::Node("IcmImuDriver", options) {
   initialize();
 }
 
