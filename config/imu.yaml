@@ -1,2 +1,5 @@
 mrs_icm_imu_driver:
-  ros__parameters: {}
+
+  main_timer:
+
+    rate: 250.0 # [Hz]

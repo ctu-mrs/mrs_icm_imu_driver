@@ -129,18 +129,16 @@ def generate_launch_description():
         package=pkg_name,
         plugin='mrs_icm_imu_driver::MrsIcmImuDriver',
         namespace=uav_name,
-        name='mrs_icm_imu_driver',
+        name='icm_imu',
 
         parameters=[
-            this_pkg_path + '/config/imu.yaml',
-            {'uav_name': uav_name},
             {'use_sim_time': use_sim_time},
-            {'rate_hz': rate_hz},
+            {'config': this_pkg_path + '/config/imu.yaml'},
             {'custom_config': custom_config},
         ],
 
         remappings=[
-            ('~/imu_out', PathJoinSubstitution(['/', uav_name, LaunchConfiguration('topic_namespace'), 'imu'])),
+            ('~/imu_out', "~/imu"),
         ],
     )
 

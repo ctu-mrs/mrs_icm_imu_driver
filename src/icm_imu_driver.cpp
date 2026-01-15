@@ -3,13 +3,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
-#include <iostream>
-#include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdint.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -17,6 +13,11 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+
+#include <mrs_lib/node.h>
+#include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/param_loader.h>
+#include <mrs_lib/timer_handler.h>
 
 //}
 
@@ -121,34 +122,43 @@
 
 //}
 
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
+//}
+
 #define INTERRUPT_PIN 11  // pin 11 equals GPIO 17
 const float G           = 9.80665;
 const float DEG2RAD     = 57.2958;
 const float ACC_SCALER  = 8192;
 const float GYRO_SCALER = 16.384;
 
-
-namespace mrs_icm_imu_driver {
+namespace mrs_icm_imu_driver
+{
 
 /* class MrsIcmImuDriver //{ */
 
-class MrsIcmImuDriver : public rclcpp::Node {
+class MrsIcmImuDriver : public mrs_lib::Node {
 public:
   MrsIcmImuDriver(rclcpp::NodeOptions options);
 
 private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
-  void initialize();
+  void                     initialize();
 
-  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
-  void                         timerPreInitialization();
-  std::atomic<bool>            is_initialized_ = false;
+  std::atomic<bool> is_initialized_ = false;
 
-  rclcpp::TimerBase::SharedPtr timer_imu_;
-  void       timerImu();
+  std::shared_ptr<TimerType> timer_main_;
 
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
+  void timerMain();
+
+  mrs_lib::PublisherHandler<sensor_msgs::msg::Imu> ph_imu_;
 };
 
 //}
@@ -156,19 +166,7 @@ private:
 /* MrsIcmImuDriver() //{ */
 
 MrsIcmImuDriver::MrsIcmImuDriver(rclcpp::NodeOptions options) : Node("IcmImuDriver", options) {
-  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&MrsIcmImuDriver::timerPreInitialization, this));
-}
-
-//}
-
-/* timerPreInitialization() //{ */
-
-void MrsIcmImuDriver::timerPreInitialization() {
-  node_  = this->shared_from_this();
-  clock_ = node_->get_clock();
-
   initialize();
-  timer_preinitialization_->cancel();
 }
 
 //}
@@ -176,24 +174,53 @@ void MrsIcmImuDriver::timerPreInitialization() {
 /* initialize() //{ */
 
 void MrsIcmImuDriver::initialize() {
-  int rate_hz;
 
-  if (!node_->has_parameter("rate_hz")) {
-    try {
-      node_->declare_parameter<int>("rate_hz");
-    } catch (const std::exception& e) {
-      RCLCPP_ERROR_STREAM(node_->get_logger(), "Could not load compulsory parameter 'rate_hz': " << e.what());
-    }
+  node_  = this_node_ptr();
+  clock_ = node_->get_clock();
+
+  mrs_lib::ParamLoader param_loader(this_node_ptr());
+
+  std::string custom_config_path;
+
+  param_loader.loadParam("custom_config", custom_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
   }
 
-  // Convert to milliseconds period
-  node_->get_parameter("rate_hz", rate_hz);
-  rate_hz = 1000 / std::clamp(rate_hz, 1, 1000);
+  param_loader.addYamlFileFromParam("config");
 
-  timer_imu_     = create_wall_timer(std::chrono::milliseconds(rate_hz), std::bind(&MrsIcmImuDriver::timerImu, this));
-  imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>("imu_out", 10);
+  double rate_hz;
 
-  RCLCPP_INFO(node_->get_logger(), "Initialized, sending IMU data every %d milliseconds", rate_hz);
+  param_loader.loadParam("mrs_icm_imu_driver/main_timer/rate", rate_hz);
+
+  if (!param_loader.loadedSuccessfully()) {
+    RCLCPP_ERROR(this_node().get_logger(), "Could not load all parameters!");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  // | ------------------------- timers ------------------------- |
+
+  mrs_lib::TimerHandlerOptions timer_opts_start;
+
+  timer_opts_start.node      = this_node_ptr();
+  timer_opts_start.autostart = true;
+
+  {
+    std::function<void()> callback_fcn = std::bind(&MrsIcmImuDriver::timerMain, this);
+
+    timer_main_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(rate_hz, clock_), callback_fcn);
+  }
+
+  // | ----------------------- Publishers ----------------------- |
+
+  ph_imu_ = mrs_lib::PublisherHandler<sensor_msgs::msg::Imu>(this_node_ptr(), "~/imu_out");
+
+  // | -------------------- finish the innit -------------------- |
+
+  RCLCPP_INFO(node_->get_logger(), "initialized");
+
   is_initialized_ = true;
 }
 
@@ -201,11 +228,13 @@ void MrsIcmImuDriver::initialize() {
 
 // | --------------------- timer callbacks -------------------- |
 
-/* timerImu() //{ */
+/* timerMain() //{ */
 
-void MrsIcmImuDriver::timerImu() {
-  if (!is_initialized_)
+void MrsIcmImuDriver::timerMain() {
+
+  if (!is_initialized_) {
     return;
+  }
 
   FILE* fifo = fopen("/dev/icm_imu", "r");
 
@@ -224,20 +253,15 @@ void MrsIcmImuDriver::timerImu() {
                    &imu.header.stamp.nanosec);
 
   if (ret == 8) {  // Check if all 8 values were successfully read
-    try {
-      RCLCPP_INFO_ONCE(node_->get_logger(), "Publishing IMU data");
-      imu_publisher_->publish(imu);
-    }
-    catch (...) {
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Exception caught when publishing");
-    }
+
+    RCLCPP_INFO_ONCE(node_->get_logger(), "Publishing IMU data");
+    ph_imu_.publish(imu);
 
   } else {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Error reading from FIFO or no more data");
   }
 
   fclose(fifo);
-  return;
 }
 
 //}

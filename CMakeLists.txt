@@ -17,10 +17,11 @@ SET(DEPENDENCIES
   rclcpp
   rclcpp_components
   sensor_msgs
+  mrs_lib
 )
 
 SET(LIBRARIES
-  MrsIcmImuDriver
+  MrsIcmImuDriver_ImuDriver
 )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -31,23 +32,27 @@ endforeach()
 ## |                           Compile                          |
 ## --------------------------------------------------------------
 
-add_library(MrsIcmImuDriver SHARED
-  src/mrs_icm_imu_driver.cpp
+add_library(MrsIcmImuDriver_ImuDriver SHARED
+  src/icm_imu_driver.cpp
 )
 
-ament_target_dependencies(MrsIcmImuDriver
-  ${DEPENDENCIES}
+target_link_libraries(MrsIcmImuDriver_ImuDriver
+  PRIVATE
+    mrs_lib::mrs_lib
+    rclcpp::rclcpp
+    rclcpp_components::component
 )
 
-rclcpp_components_register_nodes(MrsIcmImuDriver PLUGIN "mrs_icm_imu_driver::MrsIcmImuDriver" EXECUTABLE MrsIcmImuDriver)
+rclcpp_components_register_nodes(MrsIcmImuDriver_ImuDriver "mrs_icm_imu_driver::MrsIcmImuDriver")
 
-target_compile_definitions(MrsIcmImuDriver PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsIcmImuDriver_ImuDriver PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                           Install                          |
 ## --------------------------------------------------------------
 
-install(TARGETS ${LIBRARIES} EXPORT export_${PROJECT_NAME}
+install(TARGETS
+  ${LIBRARIES} EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -60,6 +65,10 @@ install(
 
 ament_export_targets(
   export_${PROJECT_NAME} HAS_LIBRARY_TARGET
+)
+
+ament_export_libraries(
+  ${LIBRARIES}
 )
 
 ament_export_dependencies(

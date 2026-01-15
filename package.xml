@@ -17,6 +17,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
+  <depend>mrs_lib</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
