@@ -156,7 +156,7 @@ def generate_launch_description():
 
     standalone_container = ComposableNodeContainer(
         namespace=uav_name,
-        name=namespace+'_container',
+        name='icm_imu_container',
         package='rclcpp_components',
         executable='component_container_mt',
         output='screen',
