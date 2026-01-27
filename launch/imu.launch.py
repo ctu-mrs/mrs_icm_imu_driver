@@ -24,7 +24,7 @@ def generate_launch_description():
     pkg_name = 'mrs_icm_imu_driver'
 
     this_pkg_path = get_package_share_directory(pkg_name)
-    namespace = 'mrs_icm_imu_driver'
+    namespace = 'icm_imu'
 
     # #{ uav_name
 
@@ -127,9 +127,9 @@ def generate_launch_description():
 
     default_node = ComposableNode(
         package=pkg_name,
-        plugin='mrs_icm_imu_driver::MrsIcmImuDriver',
+        plugin=pkg_name+'::MrsIcmImuDriver',
         namespace=uav_name,
-        name='icm_imu',
+        name=namespace,
 
         parameters=[
             {'use_sim_time': use_sim_time},
@@ -156,7 +156,7 @@ def generate_launch_description():
 
     standalone_container = ComposableNodeContainer(
         namespace=uav_name,
-        name='icm_imu_container',
+        name=namespace+'_container',
         package='rclcpp_components',
         executable='component_container_mt',
         output='screen',
