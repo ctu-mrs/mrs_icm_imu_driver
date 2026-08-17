@@ -150,7 +150,6 @@ public:
 private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
-  void                     initialize();
 
   std::atomic<bool> is_initialized_ = false;
 
@@ -166,14 +165,6 @@ private:
 /* MrsIcmImuDriver() //{ */
 
 MrsIcmImuDriver::MrsIcmImuDriver(rclcpp::NodeOptions options) : mrs_lib::Node("IcmImuDriver", options) {
-  initialize();
-}
-
-//}
-
-/* initialize() //{ */
-
-void MrsIcmImuDriver::initialize() {
 
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
